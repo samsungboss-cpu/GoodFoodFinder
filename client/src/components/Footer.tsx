@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/form";
 import { Megaphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 const formSchema = z.object({
   companyName: z.string().min(1, "기업명을 입력해주세요"),
@@ -25,7 +26,6 @@ const formSchema = z.object({
 
 export default function Footer() {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -37,20 +37,28 @@ export default function Footer() {
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    setIsSubmitting(true);
-    
-    // TODO: Replace with actual API call
-    console.log('Advertiser application submitted:', values);
-    
-    setTimeout(() => {
+  const mutation = useMutation({
+    mutationFn: async (values: z.infer<typeof formSchema>) => {
+      return await apiRequest("POST", "/api/advertiser-applications", values);
+    },
+    onSuccess: () => {
       toast({
         title: "광고 신청이 완료되었습니다!",
         description: "담당자가 곧 연락드리겠습니다.",
       });
       form.reset();
-      setIsSubmitting(false);
-    }, 1000);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "오류가 발생했습니다",
+        description: error.message || "다시 시도해주세요.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (values: z.infer<typeof formSchema>) => {
+    mutation.mutate(values);
   };
 
   return (
@@ -145,10 +153,10 @@ export default function Footer() {
                   type="submit" 
                   className="w-full bg-chart-3 hover:bg-chart-3 text-white" 
                   size="lg"
-                  disabled={isSubmitting}
+                  disabled={mutation.isPending}
                   data-testid="button-advertiser-submit"
                 >
-                  {isSubmitting ? "신청 중..." : "광고 신청하기"}
+                  {mutation.isPending ? "신청 중..." : "광고 신청하기"}
                 </Button>
               </form>
             </Form>

@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/form";
 import { MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 const formSchema = z.object({
   name: z.string().min(1, "이름을 입력해주세요"),
@@ -23,7 +24,6 @@ const formSchema = z.object({
 
 export default function LocationRequestForm() {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -33,20 +33,28 @@ export default function LocationRequestForm() {
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    setIsSubmitting(true);
-    
-    // TODO: Replace with actual API call
-    console.log('Location request submitted:', values);
-    
-    setTimeout(() => {
+  const mutation = useMutation({
+    mutationFn: async (values: z.infer<typeof formSchema>) => {
+      return await apiRequest("POST", "/api/location-requests", values);
+    },
+    onSuccess: () => {
       toast({
         title: "신청이 완료되었습니다!",
         description: "곧 맛집 정보를 보내드리겠습니다.",
       });
       form.reset();
-      setIsSubmitting(false);
-    }, 1000);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "오류가 발생했습니다",
+        description: error.message || "다시 시도해주세요.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (values: z.infer<typeof formSchema>) => {
+    mutation.mutate(values);
   };
 
   return (
@@ -103,11 +111,11 @@ export default function LocationRequestForm() {
                   type="submit" 
                   className="w-full" 
                   size="lg"
-                  disabled={isSubmitting}
+                  disabled={mutation.isPending}
                   data-testid="button-location-submit"
                 >
                   <MapPin className="w-5 h-5 mr-2" />
-                  {isSubmitting ? "신청 중..." : "맛집 찾기 신청하기"}
+                  {mutation.isPending ? "신청 중..." : "맛집 찾기 신청하기"}
                 </Button>
               </form>
             </Form>

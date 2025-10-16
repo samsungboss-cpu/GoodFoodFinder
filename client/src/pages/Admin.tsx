@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -22,29 +23,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LogOut, MapPin, Users, Megaphone } from "lucide-react";
+import { LogOut, MapPin, Users, Megaphone, Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
   username: z.string().min(1, "아이디를 입력해주세요"),
   password: z.string().min(1, "비밀번호를 입력해주세요"),
 });
 
-// TODO: remove mock data
-const mockLocationRequests = [
-  { id: 1, name: "김철수", address: "서울시 강남구 역삼동", createdAt: "2024-01-15" },
-  { id: 2, name: "이영희", address: "서울시 송파구 잠실동", createdAt: "2024-01-14" },
-  { id: 3, name: "박민수", address: "경기도 성남시 분당구", createdAt: "2024-01-13" },
-];
+type LocationRequest = {
+  id: string;
+  name: string;
+  address: string;
+  createdAt: string;
+};
 
-const mockCriticApplications = [
-  { id: 1, name: "최요리", email: "chef@example.com", phone: "010-1111-2222", createdAt: "2024-01-15" },
-  { id: 2, name: "정미식", email: "foodie@example.com", phone: "010-3333-4444", createdAt: "2024-01-14" },
-];
+type CriticApplication = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  createdAt: string;
+};
 
-const mockAdvertiserApplications = [
-  { id: 1, companyName: "맛있는 식당", representative: "홍대표", phone: "02-1234-5678", email: "info@tasty.com", createdAt: "2024-01-15" },
-  { id: 2, companyName: "진짜 맛집", representative: "김사장", phone: "02-8765-4321", email: "contact@real.com", createdAt: "2024-01-14" },
-];
+type AdvertiserApplication = {
+  id: string;
+  companyName: string;
+  representative: string;
+  phone: string;
+  email: string;
+  createdAt: string;
+};
 
 export default function Admin() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -55,6 +63,21 @@ export default function Admin() {
       username: "",
       password: "",
     },
+  });
+
+  const { data: locationRequests = [], isLoading: loadingLocations } = useQuery<LocationRequest[]>({
+    queryKey: ["/api/location-requests"],
+    enabled: isLoggedIn,
+  });
+
+  const { data: criticApplications = [], isLoading: loadingCritics } = useQuery<CriticApplication[]>({
+    queryKey: ["/api/critic-applications"],
+    enabled: isLoggedIn,
+  });
+
+  const { data: advertiserApplications = [], isLoading: loadingAdvertisers } = useQuery<AdvertiserApplication[]>({
+    queryKey: ["/api/advertiser-applications"],
+    enabled: isLoggedIn,
   });
 
   const onLogin = (values: z.infer<typeof loginSchema>) => {
@@ -68,6 +91,15 @@ export default function Admin() {
   const handleLogout = () => {
     setIsLoggedIn(false);
     form.reset();
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
   };
 
   if (!isLoggedIn) {
@@ -168,28 +200,38 @@ export default function Admin() {
             <Card>
               <div className="p-6">
                 <h2 className="text-xl font-semibold mb-4">맛집 위치 신청 목록</h2>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>번호</TableHead>
-                        <TableHead>이름</TableHead>
-                        <TableHead>주소</TableHead>
-                        <TableHead>신청일</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {mockLocationRequests.map((request) => (
-                        <TableRow key={request.id} data-testid={`row-location-${request.id}`}>
-                          <TableCell>{request.id}</TableCell>
-                          <TableCell className="font-medium">{request.name}</TableCell>
-                          <TableCell>{request.address}</TableCell>
-                          <TableCell>{request.createdAt}</TableCell>
+                {loadingLocations ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                ) : locationRequests.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    신청 내역이 없습니다
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>번호</TableHead>
+                          <TableHead>이름</TableHead>
+                          <TableHead>주소</TableHead>
+                          <TableHead>신청일</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {locationRequests.map((request, index) => (
+                          <TableRow key={request.id} data-testid={`row-location-${request.id}`}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell className="font-medium">{request.name}</TableCell>
+                            <TableCell>{request.address}</TableCell>
+                            <TableCell>{formatDate(request.createdAt)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </div>
             </Card>
           </TabsContent>
@@ -198,30 +240,40 @@ export default function Admin() {
             <Card>
               <div className="p-6">
                 <h2 className="text-xl font-semibold mb-4">미식가 지원 목록</h2>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>번호</TableHead>
-                        <TableHead>이름</TableHead>
-                        <TableHead>이메일</TableHead>
-                        <TableHead>전화번호</TableHead>
-                        <TableHead>지원일</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {mockCriticApplications.map((application) => (
-                        <TableRow key={application.id} data-testid={`row-critic-${application.id}`}>
-                          <TableCell>{application.id}</TableCell>
-                          <TableCell className="font-medium">{application.name}</TableCell>
-                          <TableCell>{application.email}</TableCell>
-                          <TableCell>{application.phone}</TableCell>
-                          <TableCell>{application.createdAt}</TableCell>
+                {loadingCritics ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                ) : criticApplications.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    지원 내역이 없습니다
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>번호</TableHead>
+                          <TableHead>이름</TableHead>
+                          <TableHead>이메일</TableHead>
+                          <TableHead>전화번호</TableHead>
+                          <TableHead>지원일</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {criticApplications.map((application, index) => (
+                          <TableRow key={application.id} data-testid={`row-critic-${application.id}`}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell className="font-medium">{application.name}</TableCell>
+                            <TableCell>{application.email}</TableCell>
+                            <TableCell>{application.phone}</TableCell>
+                            <TableCell>{formatDate(application.createdAt)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </div>
             </Card>
           </TabsContent>
@@ -230,32 +282,42 @@ export default function Admin() {
             <Card>
               <div className="p-6">
                 <h2 className="text-xl font-semibold mb-4">광고주 신청 목록</h2>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>번호</TableHead>
-                        <TableHead>기업명</TableHead>
-                        <TableHead>대표자</TableHead>
-                        <TableHead>전화번호</TableHead>
-                        <TableHead>이메일</TableHead>
-                        <TableHead>신청일</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {mockAdvertiserApplications.map((application) => (
-                        <TableRow key={application.id} data-testid={`row-advertiser-${application.id}`}>
-                          <TableCell>{application.id}</TableCell>
-                          <TableCell className="font-medium">{application.companyName}</TableCell>
-                          <TableCell>{application.representative}</TableCell>
-                          <TableCell>{application.phone}</TableCell>
-                          <TableCell>{application.email}</TableCell>
-                          <TableCell>{application.createdAt}</TableCell>
+                {loadingAdvertisers ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                ) : advertiserApplications.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    신청 내역이 없습니다
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>번호</TableHead>
+                          <TableHead>기업명</TableHead>
+                          <TableHead>대표자</TableHead>
+                          <TableHead>전화번호</TableHead>
+                          <TableHead>이메일</TableHead>
+                          <TableHead>신청일</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {advertiserApplications.map((application, index) => (
+                          <TableRow key={application.id} data-testid={`row-advertiser-${application.id}`}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell className="font-medium">{application.companyName}</TableCell>
+                            <TableCell>{application.representative}</TableCell>
+                            <TableCell>{application.phone}</TableCell>
+                            <TableCell>{application.email}</TableCell>
+                            <TableCell>{formatDate(application.createdAt)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </div>
             </Card>
           </TabsContent>

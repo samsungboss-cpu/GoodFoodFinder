@@ -1,11 +1,10 @@
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Form,
   FormControl,
@@ -16,6 +15,7 @@ import {
 } from "@/components/ui/form";
 import { CheckCircle2, Gift, TrendingUp, Users, Award } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 const formSchema = z.object({
   name: z.string().min(1, "이름을 입력해주세요"),
@@ -55,7 +55,6 @@ const benefits = [
 
 export default function FoodCriticSection() {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -66,20 +65,28 @@ export default function FoodCriticSection() {
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    setIsSubmitting(true);
-    
-    // TODO: Replace with actual API call
-    console.log('Food critic application submitted:', values);
-    
-    setTimeout(() => {
+  const mutation = useMutation({
+    mutationFn: async (values: z.infer<typeof formSchema>) => {
+      return await apiRequest("POST", "/api/critic-applications", values);
+    },
+    onSuccess: () => {
       toast({
         title: "지원이 완료되었습니다!",
         description: "검토 후 연락드리겠습니다.",
       });
       form.reset();
-      setIsSubmitting(false);
-    }, 1000);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "오류가 발생했습니다",
+        description: error.message || "다시 시도해주세요.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (values: z.infer<typeof formSchema>) => {
+    mutation.mutate(values);
   };
 
   return (
@@ -188,10 +195,10 @@ export default function FoodCriticSection() {
                   type="submit" 
                   className="w-full" 
                   size="lg"
-                  disabled={isSubmitting}
+                  disabled={mutation.isPending}
                   data-testid="button-critic-submit"
                 >
-                  {isSubmitting ? "지원 중..." : "미식가 지원하기"}
+                  {mutation.isPending ? "지원 중..." : "미식가 지원하기"}
                 </Button>
               </form>
             </Form>
